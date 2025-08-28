@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>X-Net — Benchmark de Concorrentes e Plano 30•60•90</title>
+  <style>
+    :root{
+      --brand:#E50914;           /* vermelho X-Net (ajuste aqui) */
+      --brand-2:#111111;         /* apoio */
+      --ink:#0E0E10;
+      --ink-2:#222429;
+      --paper:#0A0B0D;           /* fundo */
+      --muted:#B9C0CC;
+      --ok:#22c55e;              /* verde êxito */
+      --warn:#f59e0b;            /* âmbar */
+      --bad:#ef4444;             /* vermelho aviso */
+      --card:#121317;
+      --radius:22px;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --shadow-soft:0 6px 16px rgba(0,0,0,.25);
+    }
+    html,body{height:100%}
+    body{margin:0;font:16px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji","Segoe UI Emoji";color:#E7EAF1;background:linear-gradient(180deg, #0b0c10 0%, #0a0b0d 60%)}
+
+    /* Shell */
+    .deck{position:relative;min-height:100vh;overflow:hidden}
+    header.topbar{position:fixed;z-index:10;inset:18px 18px auto 18px;display:flex;gap:10px;align-items:center}
+    header.topbar .badge{background:var(--card);border:1px solid #1b1d23;padding:8px 12px;border-radius:999px;box-shadow:var(--shadow-soft)}
+    header.topbar .brand{display:flex;gap:10px;align-items:center}
+    header.topbar .dot{width:14px;height:14px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 6px rgba(229,9,20,.18)}
+    .actions{position:fixed;z-index:10;inset:auto 18px 18px auto;display:flex;gap:10px}
+    .btn{background:var(--brand);border:none;color:white;padding:10px 14px;border-radius:12px;font-weight:700;letter-spacing:.2px;cursor:pointer;box-shadow:var(--shadow)}
+    .btn.gray{background:#23252c;color:#e2e6ef;border:1px solid #2c2f38}
+
+    /* Slides */
+    .slides{scroll-snap-type:y mandatory;height:100vh;overflow-y:auto}
+    section.slide{scroll-snap-align:start;min-height:100vh;display:grid;place-items:center;padding:80px 6vw}
+    .grid{display:grid;gap:18px}
+    .cols-2{grid-template-columns:1.2fr 1fr}
+    .cols-3{grid-template-columns:repeat(3,1fr)}
+    .cols-4{grid-template-columns:repeat(4,1fr)}
+    @media(max-width:1100px){.cols-2,.cols-3,.cols-4{grid-template-columns:1fr}}
+
+    .card{background:linear-gradient(180deg,#14161b, #0f1014);border:1px solid #1d2026;border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-soft)}
+    .title{font-weight:900;font-size:46px;line-height:1.1;margin:0 0 10px}
+    .subtitle{font-weight:700;font-size:18px;color:#c6ccd9;margin:0}
+    .kpi{display:flex;align-items:baseline;gap:10px}
+    .kpi b{font-size:54px}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:#1a1d24;border:1px solid #2a2e37;color:#c8cfda;font-weight:600}
+    .chip .led{width:10px;height:10px;border-radius:50%}
+
+    .cover{background:radial-gradient(1200px 600px at 20% -20%, rgba(229,9,20,.25), transparent 60%), radial-gradient(1200px 600px at 120% 120%, rgba(229,9,20,.18), transparent 60%)}
+    .cover .huge{font-size:72px;line-height:1.05}
+    .muted{color:#A5ADBD}
+    .accent{color:var(--brand)}
+
+    ul.clean{margin:0;padding-left:20px}
+    ul.clean li{margin:8px 0}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+
+    .tag{font-weight:800;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#c6ccd9}
+    .pill{display:inline-flex;padding:6px 12px;border:1px solid #2a2d35;border-radius:999px;gap:6px;background:#12141a}
+
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:12px;border-bottom:1px solid #222531;text-align:left}
+    .table th{color:#AEB6C6;font-weight:800;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+
+    .foot{opacity:.85;font-size:12px;margin-top:14px}
+
+    /* Print */
+    @media print{
+      header.topbar,.actions{display:none}
+      .slide{page-break-after:always}
+      body{background:white;color:#111}
+      .card{border-color:#ddd;box-shadow:none}
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="deck">
+    <header class="topbar">
+      <div class="badge brand"><span class="dot"></span><strong style="letter-spacing:.3px">X-Net</strong> • Benchmark & Plano 30•60•90</div>
+      <div class="badge">Apresentação HTML • setas para navegar</div>
+    </header>
+    <div class="actions">
+      <button class="btn gray" onclick="prev()">◄ Anterior</button>
+      <button class="btn gray" onclick="next()">Próximo ►</button>
+      <button class="btn" onclick="window.print()">Exportar PDF</button>
+    </div>
+
+    <main class="slides" id="slides">
+      <!-- Cover -->
+      <section class="slide cover">
+        <div class="grid cols-2" style="align-items:center">
+          <div>
+            <h1 class="title huge">Dominando o Território Digital da <span class="accent">X‑Net</span></h1>
+            <p class="subtitle">Benchmark de concorrentes, SWOT, oportunidades perdidas e Plano de Ataque 30•60•90 dias para crescer base de assinantes e share de voz em São Paulo.</p>
+            <div style="display:flex;gap:10px;margin-top:20px">
+              <span class="pill"><span class="tag">Autor</span><b>Gustavo Vieira</b></span>
+              <span class="pill"><span class="tag">Data</span><b><span id="today"></span></b></span>
+              <span class="pill"><span class="tag">Canais</span><b>Instagram • Google • Meta Ads</b></span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="kpi"><b class="accent">4,9★</b><span class="muted">no Google • <b>2.000</b> avaliações</span></div>
+            <ul class="clean" style="margin-top:8px">
+              <li><b>Maior ativo atual:</b> prova social esmagadora na região.</li>
+              <li><b>Maior lacuna:</b> ausência de mídia paga ativa (Meta Ads) e diferenciais pouco claros no Instagram.</li>
+              <li><b>Momento:</b> Concorrentes principais com <i>pouca</i> ou nenhuma mídia ativa. Janela para dominar share de atenção.</li>
+            </ul>
+            <p class="foot">Fonte: prints fornecidos de perfis IG e Biblioteca de Anúncios Meta.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sumário -->
+      <section class="slide">
+        <div class="grid cols-2">
+          <div>
+            <h2 class="title">Agenda</h2>
+            <ul class="clean">
+              <li>Visão rápida do mercado local</li>
+              <li>Benchmark Instagram e Google</li>
+              <li>Ads: quem está comprando mídia</li>
+              <li>SWOT X‑Net</li>
+              <li>Plano 30•60•90 com metas e KPIs</li>
+              <li>Frameworks de criativos e scripts</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 class="subtitle">Concorrentes analisados</h3>
+            <table class="table">
+              <tr><th>Marca</th><th>Força</th><th>Risco para X‑Net</th></tr>
+              <tr><td>Space Network</td><td>Visual jovem e entretenimento</td><td>Médio</td></tr>
+              <tr><td>Choconet</td><td>Autoridade técnica</td><td>Médio</td></tr>
+              <tr><td>Hub Telecom</td><td>Branding vibrante e promoções</td><td>Médio‑alto</td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Instagram Benchmark -->
+      <section class="slide">
+        <div class="grid cols-2">
+          <div>
+            <h2 class="title">Instagram • o que vimos</h2>
+            <ul class="clean">
+              <li><b>X‑Net:</b> identidade consistente em vermelho; excesso de institucionais; poucos diferenciais e CTAs fracos.</li>
+              <li><b>Space Network:</b> conteúdo pop (séries, games); bom engajamento; pouca profundidade técnica.</li>
+              <li><b>Choconet:</b> tom sério, educativo e confiável; visual monótono; baixo apelo emocional.</li>
+              <li><b>Hub Telecom:</b> feed vibrante, mascotes e ofertas; risco de percepção “barateiro”.</li>
+            </ul>
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+              <span class="chip"><span class="led" style="background:var(--ok)"></span>Humanização</span>
+              <span class="chip"><span class="led" style="background:var(--warn)"></span>Diferenciais claros</span>
+              <span class="chip"><span class="led" style="background:var(--bad)"></span>Excesso de comemorativos</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3 class="subtitle">Diretrizes para X‑Net</h3>
+            <ul class="clean">
+              <li>50% Conteúdo de <b>valor</b> (tutoriais Wi‑Fi, bastidores técnicos, comparativos)</li>
+              <li>30% <b>Comerciais</b> com oferta e CTA para WhatsApp</li>
+              <li>20% <b>Institucional</b> e comunidade</li>
+              <li>Design com <b>respiro visual</b>, fotos reais e carrosséis explicativos</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Google Ratings Chart -->
+      <section class="slide">
+        <div class="grid cols-2">
+          <div>
+            <h2 class="title">Google • Reputação Local</h2>
+            <p class="subtitle">Nota média e volume de avaliações (GMB):</p>
+            <div class="card"><canvas id="chartRatings" height="210"></canvas></div>
+            <p class="foot">X‑Net 4,9★ (2.000); Space Network 4,5★ (1.000); Choconet 4,9★ (148).</p>
+          </div>
+          <div class="card">
+            <h3 class="subtitle">O que isso diz</h3>
+            <ul class="clean">
+              <li><b>Prova social da X‑Net é dominante</b> e pouco explorada no conteúdo e anúncios.</li>
+              <li>Space Network com imagem moderna mas <b>menor reputação</b> — vulnerabilidade.</li>
+              <li>Choconet com nota alta, porém <b>baixo volume</b> de reviews → fácil superar.</li>
+            </ul>
+            <h3 class="subtitle" style="margin-top:20px">Ações imediatas</h3>
+            <ul class="clean">
+              <li>Campanha “<b>2.000 avaliações 4,9★</b>” como eixo de confiança nos criativos.</li>
+              <li>Google Posts semanais com ofertas e depoimentos.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ads Library -->
+      <section class="slide">
+        <div class="grid cols-2">
+          <div>
+            <h2 class="title">Meta Ads • Quem está no jogo</h2>
+            <div class="card"><canvas id="chartAds" height="220"></canvas></div>
+            <p class="foot">Hub Telecom com anúncios ativos; X‑Net e Space Network sem campanhas ativas nos prints; oportunidade de first‑mover.</p>
+          </div>
+          <div class="card">
+            <h3 class="subtitle">Oportunidade</h3>
+            <ul class="clean">
+              <li>Share de voz barato enquanto concorrentes não anunciam.</li>
+              <li>Mensagens hiperlocais por bairro, explorando dor de <b>travamento</b> + prova social.</li>
+              <li>Estratégia em 3 camadas: Aquisição → Prova Social → Remarketing com urgência.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SWOT -->
+      <section class="slide">
+        <div class="grid cols-2">
+          <div>
+            <h2 class="title">SWOT • X‑Net</h2>
+            <div class="grid cols-2">
+              <div class="card"><h3 class="subtitle">Forças</h3><ul class="clean">
+                <li>4,9★ com 2.000 avaliações no Google.</li>
+                <li>Loja física e identidade forte na região.</li>
+                <li>Equipe próxima da comunidade.</li>
+              </ul></div>
+              <div class="card"><h3 class="subtitle">Fraquezas</h3><ul class="clean">
+                <li>Instagram pouco orientado a venda/diferenciais.</li>
+                <li>Ausência de mídia paga ativa.</li>
+                <li>CTAs fracos e pouca urgência.</li>
+              </ul></div>
+              <div class="card"><h3 class="subtitle">Oportunidades</h3><ul class="clean">
+                <li>Concorrentes com mídia inativa → captura de share.</li>
+                <li>Explorar prova social e bastidores técnicos.</li>
+                <li>Segmentação por bairro com ofertas dinâmicas.</li>
+              </ul></div>
+              <div class="card"><h3 class="subtitle">Ameaças</h3><ul class="clean">
+                <li>Concorrentes com comunicação pop e promoções agressivas.</li>
+                <li>Guerra de preço sem diferenciação de valor.</li>
+              </ul></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 class="subtitle">Posicionamento‑âncora</h3>
+            <p><b>“A internet mais confiável do bairro, comprovada por 2.000 avaliações 4,9★.”</b></p>
+            <ul class="clean">
+              <li>Promessa principal: <b>Estabilidade que não te abandona</b>.</li>
+              <li>Provas: reviews, speedtests reais, SLA de suporte.</li>
+              <li>Rituais: posts de instalação do dia, depoimentos em vídeo, ranking de bairros atendidos.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Plano 30-60-90 -->
+      <section class="slide">
+        <h2 class="title">Plano de Ataque 30•60•90</h2>
+        <div class="grid cols-3">
+          <div class="card"><h3 class="subtitle">0–30 dias • Lançar</h3><ul class="clean">
+            <li>Campanhas Meta Ads por bairro (Tráfego → WhatsApp).</li>
+            <li>3 modelos de criativo: <b>Dor</b>, <b>Prova Social</b>, <b>Oferta</b>.</li>
+            <li>Pacote de 12 posts: 6 valor, 4 comerciais, 2 institucionais.</li>
+            <li>Landing de planos com prova social e botão fixo.</li>
+          </ul><div class="kpi"><b>Meta:</b> 100 leads / CPL ≤ R$15</div></div>
+          <div class="card"><h3 class="subtitle">31–60 dias • Otimizar</h3><ul class="clean">
+            <li>Testes A/B de thumb, texto e CTA.</li>
+            <li>Remarketing para cliques não convertidos + depoimentos.</li>
+            <li>Google Posts semanais + pedido de avaliação pós‑instalação.</li>
+          </ul><div class="kpi"><b>Meta:</b> +25% conv. e ≤ R$12 CPL</div></div>
+          <div class="card"><h3 class="subtitle">61–90 dias • Escalar</h3><ul class="clean">
+            <li>Expansão para novos bairros com LAL 1%.</li>
+            <li>Campanha Empresas + Gamer Pro.</li>
+            <li>Programa de Indicação local (Member‑Get‑Member).</li>
+          </ul><div class="kpi"><b>Meta:</b> 200 instalações/mês</div></div>
+        </div>
+      </section>
+
+      <!-- KPIs -->
+      <section class="slide">
+        <div class="grid cols-2">
+          <div>
+            <h2 class="title">KPIs e Painel</h2>
+            <ul class="clean">
+              <li><b>CPL</b>, <b>Taxa de Conversão WhatsApp→Instalação</b>, <b>Churn 30d</b></li>
+              <li>Índice de satisfação: <b>média de estrelas</b> + <b>reviews novos/semana</b></li>
+              <li>Tempo médio de primeira resposta no WhatsApp</li>
+              <li>Tempo de instalação após fechamento</li>
+            </ul>
+            <div class="card"><canvas id="chartFunnel" height="210"></canvas></div>
+          </div>
+          <div class="card">
+            <h3 class="subtitle">Padrões de Excelência</h3>
+            <ul class="clean">
+              <li>Resposta WhatsApp ≤ <b>2 min</b></li>
+              <li>Instalação ≤ <b>24 h</b> regiões cobertas</li>
+              <li>CPL alvo: <b>R$ 10–15</b></li>
+              <li>Churn 30d &lt; <b>5%</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Criativos -->
+      <section class="slide">
+        <div class="grid cols-3">
+          <div class="card"><h3 class="subtitle">Criativo 1 • Dor</h3><p><b>Gancho:</b> “Sua internet <span class="bad">trava</span> na hora do jogo?”<br><b>Copy:</b> Estabilidade X‑Net comprovada por 2.000 avaliações 4,9★. Instalação grátis no seu bairro. <b>Clique e ative no WhatsApp.</b></p></div>
+          <div class="card"><h3 class="subtitle">Criativo 2 • Prova Social</h3><p><b>Gancho:</b> “2.000 vizinhos deram 4,9★.”<br><b>Copy:</b> Não é promessa, é histórico. Internet que não te abandona. <b>Assine hoje.</b></p></div>
+          <div class="card"><h3 class="subtitle">Criativo 3 • Oferta</h3><p><b>Gancho:</b> “Fibra turbo no seu CEP hoje.”<br><b>Copy:</b> Planos a partir de <b>R$ X,90</b> + instalação grátis. <b>Últimas vagas no bairro.</b></p></div>
+        </div>
+      </section>
+
+      <!-- Oportunidades -->
+      <section class="slide">
+        <h2 class="title">Oportunidades que estão na mesa</h2>
+        <div class="grid cols-2">
+          <div class="card"><h3 class="subtitle">Imediatas</h3><ul class="clean">
+            <li>Ativar Meta Ads com hiperlocalização.</li>
+            <li>Carrosséis técnicos (roteador, ONT, alcance Wi‑Fi) com linguagem simples.</li>
+            <li>Diários de instalação: antes→depois + depoimento do cliente.</li>
+          </ul></div>
+          <div class="card"><h3 class="subtitle">Em 60–90 dias</h3><ul class="clean">
+            <li>Programa de indicação residente→vizinho.</li>
+            <li>Parcerias com influenciadores de bairro.</li>
+            <li>Live mensal de perguntas e respostas de internet.</li>
+          </ul></div>
+        </div>
+      </section>
+
+      <!-- Encerramento -->
+      <section class="slide">
+        <div class="grid cols-2" style="align-items:center">
+          <div>
+            <h2 class="title">Conclusão</h2>
+            <ul class="clean">
+              <li>A X‑Net tem a <b>maior prova social</b> do território e está subutilizando esse ativo.</li>
+              <li>Concorrentes anunciam pouco ou nada → janela para <b>dominar share</b> rapidamente.</li>
+              <li>Plano 30•60•90 entrega tração, otimização e escala com KPIs claros.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 class="subtitle">Próximos passos sugeridos</h3>
+            <ol class="clean">
+              <li>Ligar campanhas por bairro em 48 h com 3 criativos-base.</li>
+              <li>Implementar pedido automático de review pós-instalação.</li>
+              <li>Ritual semanal de conteúdo técnico + depoimento.</li>
+            </ol>
+            <p class="foot">Contato: <b>Gustavo Vieira</b> — consultoria de growth para ISPs.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // ---------- Navegação (corrige erro prev/next não definidos) ----------
+    const slidesEl = document.getElementById('slides');
+    function next(){ if(slidesEl){ slidesEl.scrollBy({ top: window.innerHeight, behavior: 'smooth' }); } }
+    function prev(){ if(slidesEl){ slidesEl.scrollBy({ top: -window.innerHeight, behavior: 'smooth' }); } }
+    window.addEventListener('keydown', (e)=>{
+      if(['ArrowDown','PageDown','ArrowRight',' '].includes(e.key)) next();
+      if(['ArrowUp','PageUp','ArrowLeft'].includes(e.key)) prev();
+    });
+
+    // Data badge
+    const todayEl = document.getElementById('today');
+    if(todayEl){ todayEl.textContent = new Date().toLocaleDateString('pt-BR'); }
+
+    // ---------- Gráficos ----------
+    const ratings = {
+      labels:["X‑Net","Space Network","Choconet"],
+      stars:[4.9,4.5,4.9],
+      reviews:[2000,1000,148]
+    };
+
+    const ads = {
+      labels:["X‑Net","Space Network","Hub Telecom"],
+      active:[0,0,2]
+    };
+
+    const funnel = {
+      labels:["Cliques","WhatsApp","Fechamentos"],
+      values:[1000,280,120]
+    };
+
+    function safeChart(id, cfg){
+      const el = document.getElementById(id);
+      if(!window.Chart || !el) return null;
+      return new Chart(el, cfg);
+    }
+
+    safeChart('chartRatings',{
+      type:'bar',
+      data:{
+        labels:ratings.labels,
+        datasets:[
+          {label:'Nota média',data:ratings.stars,yAxisID:'y1',borderWidth:0,backgroundColor:'rgba(229,9,20,.85)'},
+          {label:'Qtd. avaliações',data:ratings.reviews,yAxisID:'y2',borderWidth:0,backgroundColor:'rgba(255,255,255,.18)'}
+        ]
+      },
+      options:{
+        responsive:true,plugins:{legend:{labels:{color:'#d8deea'}}},
+        scales:{
+          x:{ticks:{color:'#c9d0dd'}},
+          y1:{type:'linear',position:'left',min:4,max:5,ticks:{color:'#c9d0dd'}},
+          y2:{type:'linear',position:'right',grid:{drawOnChartArea:false},ticks:{color:'#c9d0dd'}}
+        }
+      }
+    });
+
+    safeChart('chartAds',{
+      type:'bar',
+      data:{labels:ads.labels,datasets:[{label:'Anúncios ativos (Meta)',data:ads.active,backgroundColor:'rgba(229,9,20,.85)'}]},
+      options:{plugins:{legend:{labels:{color:'#d8deea'}}},scales:{x:{ticks:{color:'#c9d0dd'}},y:{ticks:{color:'#c9d0dd'}}}}
+    });
+
+    safeChart('chartFunnel',{
+      type:'doughnut',
+      data:{labels:funnel.labels,datasets:[{data:funnel.values,backgroundColor:["rgba(229,9,20,.85)","rgba(255,255,255,.22)","rgba(255,255,255,.12)"]}]},
+      options:{plugins:{legend:{labels:{color:'#d8deea'}}}}
+    });
+  </script>
+</body>
+</html>
